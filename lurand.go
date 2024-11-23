@@ -11,8 +11,8 @@ const defaultMax = 1_000_000 // default set to 1 million
 // Use a map[int]int to implement large-scale unique random number generation.
 // For example, start by generating random numbers between 0 and 1,000,000.
 // Suppose the random number generated is 999. If the map does not have this number as a key,
-// return this number and store the current last available number (e.g., 1,000,000) in this key-value pair,
-// i.e., <999: 1000000>. Then, the next random number should be generated between 0 and 999,999 (decrement max by 1).
+// return this number and store the current last available number (e.g., 999,999) in this key-value pair,
+// i.e., <999: 999,999>. Then, the next random number should be generated between 0 and 999,998 (decrement max by 1).
 // Similarly, if the next random number's key exists in the map, return its value,
 // and overwrite it with the last available number, while decrementing max by 1.
 // This is similar to the Fisher–Yates Shuffle algorithm.
@@ -67,6 +67,7 @@ func (r *LUR) Intn() int {
 	return val
 }
 
+// LUR64 is a 64-bit version of LUR
 type LUR64 struct {
 	mapping map[int64]int64
 	max     int64
