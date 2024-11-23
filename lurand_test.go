@@ -77,4 +77,18 @@ func BenchmarkTest(b *testing.B) {
 			}
 		})
 	})
+
+	// BenchmarkTest/Customize_64_Max_Succeed-8               	 3677482	       510.3 ns/op	      84 B/op	       0 allocs/op
+	b.Run("Customize 64 Max Succeed", func(b *testing.B) {
+		rg := New64_(int64(b.N))
+		dedup := make(map[int64]bool)
+		for i := 0; i < b.N; i++ {
+			num := rg.Int63n()
+			if dedup[num] {
+				b.Errorf("%d: duplicate num: %d", i, num)
+				return
+			}
+			dedup[num] = true
+		}
+	})
 }

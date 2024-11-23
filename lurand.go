@@ -33,6 +33,9 @@ func New() *LUR {
 }
 
 func New_(max int) *LUR {
+	if max <= 0 {
+		panic("Max must be greater than 0")
+	}
 	return &LUR{
 		mapping: make(map[int]int),
 		max:     max,
@@ -51,6 +54,55 @@ func (r *LUR) Intn() int {
 	delete(r.mapping, r.max) // optimize memory usage
 
 	key := r.rnd.Intn(r.max)
+	val, ok1 := r.mapping[key]
+	rep, ok2 := r.mapping[r.max-1] // replace
+	if !ok2 {
+		rep = r.max - 1
+	}
+	r.mapping[key] = rep
+	r.max--
+	if !ok1 {
+		val = key
+	}
+	return val
+}
+
+type LUR64 struct {
+	mapping map[int64]int64
+	max     int64
+	rnd     *rand.Rand
+	mu      sync.Mutex
+}
+
+func New64() *LUR64 {
+	return &LUR64{
+		mapping: make(map[int64]int64),
+		max:     defaultMax,
+		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func New64_(max int64) *LUR64 {
+	if max <= 0 {
+		panic("Max must be greater than 0")
+	}
+	return &LUR64{
+		mapping: make(map[int64]int64),
+		max:     max,
+		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (r *LUR64) Int63n() int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.max <= 0 {
+		panic("No more numbers available")
+	}
+	delete(r.mapping, r.max)
+
+	key := r.rnd.Int63n(r.max)
 	val, ok1 := r.mapping[key]
 	rep, ok2 := r.mapping[r.max-1] // replace
 	if !ok2 {
