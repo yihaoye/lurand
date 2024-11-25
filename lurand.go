@@ -20,11 +20,11 @@ type LUR struct {
 	mapping map[int]int // mapping random number to current available number
 	max     int         // current available number range
 	rnd     *rand.Rand
-	mu      sync.Mutex
+	offset  int
 }
 
 // New init time complexity O(1)
-func New() *LUR {
+func UnsafeNew() *LUR {
 	return &LUR{
 		mapping: make(map[int]int),
 		max:     defaultMax,
@@ -32,7 +32,7 @@ func New() *LUR {
 	}
 }
 
-func New_(max int) *LUR {
+func UnsafeNew_(max, offset int) *LUR {
 	if max <= 0 {
 		panic("Max must be greater than 0")
 	}
@@ -40,14 +40,12 @@ func New_(max int) *LUR {
 		mapping: make(map[int]int),
 		max:     max,
 		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		offset:  offset,
 	}
 }
 
 // Intn time complexity O(1), space complexity O(N)
 func (r *LUR) Intn() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if r.max <= 0 {
 		panic("No more numbers available")
 	}
@@ -64,7 +62,7 @@ func (r *LUR) Intn() int {
 	if !ok1 {
 		val = key
 	}
-	return val
+	return val + r.offset
 }
 
 // LUR64 is a 64-bit version of LUR
@@ -72,10 +70,10 @@ type LUR64 struct {
 	mapping map[int64]int64
 	max     int64
 	rnd     *rand.Rand
-	mu      sync.Mutex
+	offset  int64
 }
 
-func New64() *LUR64 {
+func UnsafeNew64() *LUR64 {
 	return &LUR64{
 		mapping: make(map[int64]int64),
 		max:     defaultMax,
@@ -83,7 +81,7 @@ func New64() *LUR64 {
 	}
 }
 
-func New64_(max int64) *LUR64 {
+func UnsafeNew64_(max, offset int64) *LUR64 {
 	if max <= 0 {
 		panic("Max must be greater than 0")
 	}
@@ -91,13 +89,11 @@ func New64_(max int64) *LUR64 {
 		mapping: make(map[int64]int64),
 		max:     max,
 		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		offset:  offset,
 	}
 }
 
 func (r *LUR64) Int63n() int64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if r.max <= 0 {
 		panic("No more numbers available")
 	}
@@ -114,5 +110,40 @@ func (r *LUR64) Int63n() int64 {
 	if !ok1 {
 		val = key
 	}
-	return val
+	return val + r.offset
+}
+
+// Concurrency Safety
+type Pool struct {
+	*sync.Pool
+}
+
+func New_(max int) *Pool {
+	offset := 10_000
+	pool := &sync.Pool{}
+
+	for i := 0; ; i++ {
+		if offset*i >= max {
+			break
+		}
+		lur := UnsafeNew_(offset, offset*i)
+		pool.Put(lur)
+	}
+	return &Pool{pool}
+}
+
+func (p *Pool) Intn() int {
+	var lur *LUR
+	for {
+		i := p.Get()
+		if i != nil {
+			lur = i.(*LUR)
+			break
+		}
+	}
+	v := lur.Intn()
+	if lur.max > 0 {
+		p.Put(lur)
+	}
+	return v
 }

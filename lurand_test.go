@@ -7,7 +7,7 @@ import (
 
 func TestRegular(t *testing.T) {
 	t.Run("Default Max Succeed", func(t *testing.T) {
-		rg := New()
+		rg := UnsafeNew()
 		dedup := make(map[int]bool)
 		for i := 0; i < defaultMax; i++ {
 			num := rg.Intn()
@@ -34,7 +34,7 @@ func TestRegular(t *testing.T) {
 			}
 		}()
 
-		rg := New()
+		rg := UnsafeNew()
 		dedup := make(map[int]bool)
 		for i := 0; i < defaultMax+1; i++ {
 			num := rg.Intn()
@@ -50,7 +50,7 @@ func TestRegular(t *testing.T) {
 func BenchmarkTest(b *testing.B) {
 	// BenchmarkTest/Customize_Max_Succeed-8         	 4058866	       491.1 ns/op	      76 B/op	       0 allocs/op
 	b.Run("Customize Max Succeed", func(b *testing.B) {
-		rg := New_(b.N)
+		rg := UnsafeNew_(b.N, 0)
 		dedup := make(map[int]bool)
 		for i := 0; i < b.N; i++ {
 			num := rg.Intn()
@@ -64,11 +64,12 @@ func BenchmarkTest(b *testing.B) {
 
 	// BenchmarkTest/Parallel_Customize_Max_Succeed-8         	 1000000	      1056 ns/op	     194 B/op	       4 allocs/op
 	b.Run("Parallel Customize Max Succeed", func(b *testing.B) {
-		rg := New_(b.N)
+		p := New_(10_000_000)
 		dedup := sync.Map{}
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; pb.Next(); i++ {
-				num := rg.Intn()
+				num := p.Intn()
+				b.Log(num)
 				if _, ok := dedup.Load(num); ok {
 					b.Errorf("%d: duplicate num: %d", i, num)
 					return
@@ -80,7 +81,7 @@ func BenchmarkTest(b *testing.B) {
 
 	// BenchmarkTest/Customize_64_Max_Succeed-8               	 3677482	       510.3 ns/op	      84 B/op	       0 allocs/op
 	b.Run("Customize 64 Max Succeed", func(b *testing.B) {
-		rg := New64_(int64(b.N))
+		rg := UnsafeNew64_(int64(b.N), 0)
 		dedup := make(map[int64]bool)
 		for i := 0; i < b.N; i++ {
 			num := rg.Int63n()
