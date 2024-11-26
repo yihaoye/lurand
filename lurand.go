@@ -20,7 +20,9 @@ type LUR struct {
 	mapping map[int]int // mapping random number to current available number
 	max     int         // current available number range
 	rnd     *rand.Rand
-	offset  int
+
+	offset int
+	mu     sync.Mutex
 }
 
 // New init time complexity O(1)
@@ -114,36 +116,26 @@ func (r *LUR64) Int63n() int64 {
 }
 
 // Concurrency Safety
-type Pool struct {
-	*sync.Pool
-}
+type LURS []*LUR
 
-func New_(max int) *Pool {
-	offset := 10_000
-	pool := &sync.Pool{}
+func New_(max int) *LURS {
+	offset := 100_000
+	lurs := make(LURS, 0)
 
 	for i := 0; ; i++ {
 		if offset*i >= max {
 			break
 		}
 		lur := UnsafeNew_(offset, offset*i)
-		pool.Put(lur)
+		lurs = append(lurs, lur)
 	}
-	return &Pool{pool}
+	return &lurs
 }
 
-func (p *Pool) Intn() int {
-	var lur *LUR
-	for {
-		i := p.Get()
-		if i != nil {
-			lur = i.(*LUR)
-			break
-		}
-	}
-	v := lur.Intn()
-	if lur.max > 0 {
-		p.Put(lur)
-	}
-	return v
+func (r LURS) Intn() int {
+	i := time.Now().UnixNano() % int64(len(r))
+	r[i].mu.Lock()
+	defer r[i].mu.Unlock()
+
+	return r[i].Intn()
 }
