@@ -133,7 +133,7 @@ func New_(max int) *LURS {
 }
 
 func (r LURS) Intn() int {
-	i := time.Now().UnixNano() % int64(len(r))
+	i := time.Now().UnixNano() % int64(len(r)) // goroutine + timestamp == quick safe random
 	r[i].mu.Lock()
 	defer r[i].mu.Unlock()
 
