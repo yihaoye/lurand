@@ -3,6 +3,7 @@ package lurand
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -116,26 +117,35 @@ func (r *LUR64) Int63n() int64 {
 }
 
 // Concurrency Safety
-type LURS []*LUR
+type Pool struct {
+	lurs []*LUR
+	size int32
+}
 
-func New_(max int) *LURS {
+func New_(max int) *Pool {
 	offset := 100_000
-	lurs := make(LURS, 0)
+	p := Pool{}
 
 	for i := 0; ; i++ {
 		if offset*i >= max {
 			break
 		}
 		lur := UnsafeNew_(offset, offset*i)
-		lurs = append(lurs, lur)
+		p.lurs = append(p.lurs, lur)
+		p.size++
 	}
-	return &lurs
+	return &p
 }
 
-func (r LURS) Intn() int {
-	i := time.Now().UnixNano() % int64(len(r)) // goroutine + timestamp == quick safe random
-	r[i].mu.Lock()
-	defer r[i].mu.Unlock()
+func (p Pool) Intn() int {
+	i := time.Now().UnixNano() % int64(p.size) // goroutine + timestamp == quick safe random
+	p.lurs[i].mu.Lock()
+	defer p.lurs[i].mu.Unlock()
 
-	return r[i].Intn()
+	v := p.lurs[i].Intn()
+	if p.lurs[i].max <= 0 {
+		atomic.AddInt32(&p.size, -1)
+		// ...
+	}
+	return v
 }
