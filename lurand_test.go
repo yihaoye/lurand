@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestRegular(t *testing.T) {
-	t.Run("Default Max Succeed", func(t *testing.T) {
+func TestFunctions(t *testing.T) {
+	t.Run("default max succeed", func(t *testing.T) {
 		rg := New()
 		dedup := make(map[int]bool)
 		for i := 0; i < defaultMax; i++ {
@@ -23,7 +23,7 @@ func TestRegular(t *testing.T) {
 		}
 	})
 
-	t.Run("Default Max Failed", func(t *testing.T) {
+	t.Run("default max failed", func(t *testing.T) {
 		defer func() {
 			if r := recover(); r != nil {
 				if r != "No more numbers available" {
@@ -45,50 +45,69 @@ func TestRegular(t *testing.T) {
 			dedup[num] = true
 		}
 	})
+
+	t.Run("custom max parallel succeed", func(t *testing.T) {
+		rg := New_(1_500_000)
+		dedup := sync.Map{}
+		var wg sync.WaitGroup
+		concurrentWorkers := 100
+		numbersPerWorker := 15_000
+
+		for i := 0; i < concurrentWorkers; i++ {
+			wg.Add(1)
+			go func(workerID int) {
+				defer wg.Done()
+				for j := 0; j < numbersPerWorker; j++ {
+					num := rg.Intn()
+					if _, loaded := dedup.LoadOrStore(num, true); loaded {
+						t.Errorf("worker %d: duplicate num: %d", workerID, num)
+						return
+					}
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		totalNumbers := concurrentWorkers * numbersPerWorker
+		count := 0
+		dedup.Range(func(_, _ interface{}) bool {
+			count++
+			return true
+		})
+		if count != totalNumbers {
+			t.Errorf("expected %d unique numbers, but got %d", totalNumbers, count)
+		}
+	})
 }
 
+// goos: darwin
+// goarch: amd64
+// cpu: 2.50GHz
 func BenchmarkTest(b *testing.B) {
-	// BenchmarkTest/Customize_Max_Succeed-8         	 4058866	       491.1 ns/op	      76 B/op	       0 allocs/op
-	b.Run("Customize Max Succeed", func(b *testing.B) {
+	// BenchmarkTest/New_-8         	 9195213	       253.7 ns/op	      19 B/op	       0 allocs/op
+	b.Run("New_", func(b *testing.B) {
 		rg := New_(b.N)
-		dedup := make(map[int]bool)
 		for i := 0; i < b.N; i++ {
-			num := rg.Intn()
-			if dedup[num] {
-				b.Errorf("%d: duplicate num: %d", i, num)
-				return
-			}
-			dedup[num] = true
+			_ = rg.Intn()
 		}
 	})
 
-	// BenchmarkTest/Parallel_Customize_Max_Succeed-8         	 1000000	      1056 ns/op	     194 B/op	       4 allocs/op
-	b.Run("Parallel Customize Max Succeed", func(b *testing.B) {
+	// BenchmarkTest/Parallel-8         	 3225256	       372.9 ns/op	      15 B/op	       0 allocs/op
+	b.Run("Parallel", func(b *testing.B) {
 		rg := New_(b.N)
-		dedup := sync.Map{}
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; pb.Next(); i++ {
-				num := rg.Intn()
-				if _, ok := dedup.Load(num); ok {
-					b.Errorf("%d: duplicate num: %d", i, num)
-					return
-				}
-				dedup.Store(num, true)
+				_ = rg.Intn()
 			}
 		})
 	})
 
-	// BenchmarkTest/Customize_64_Max_Succeed-8               	 3677482	       510.3 ns/op	      84 B/op	       0 allocs/op
-	b.Run("Customize 64 Max Succeed", func(b *testing.B) {
+	// BenchmarkTest/New64_-8               	10168356	       246.4 ns/op	      18 B/op	       0 allocs/op
+	b.Run("New64_", func(b *testing.B) {
 		rg := New64_(int64(b.N))
-		dedup := make(map[int64]bool)
 		for i := 0; i < b.N; i++ {
-			num := rg.Int63n()
-			if dedup[num] {
-				b.Errorf("%d: duplicate num: %d", i, num)
-				return
-			}
-			dedup[num] = true
+			_ = rg.Int63n()
 		}
 	})
 }
