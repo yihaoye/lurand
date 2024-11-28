@@ -67,6 +67,56 @@ func (r *LUR) Intn() int {
 	return val
 }
 
+// LUR32 is a 32-bit version of LUR
+type LUR32 struct {
+	mapping map[int32]int32
+	max     int32
+	rnd     *rand.Rand
+	mu      sync.Mutex
+}
+
+func New32() *LUR32 {
+	return &LUR32{
+		mapping: make(map[int32]int32),
+		max:     int32(defaultMax),
+		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func New32_(max int32) *LUR32 {
+	if max <= 0 {
+		panic("Max must be greater than 0")
+	}
+	return &LUR32{
+		mapping: make(map[int32]int32),
+		max:     max,
+		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (r *LUR32) Int31n() int32 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.max <= 0 {
+		panic("No more numbers available")
+	}
+	delete(r.mapping, r.max)
+
+	key := r.rnd.Int31n(r.max)
+	val, ok1 := r.mapping[key]
+	rep, ok2 := r.mapping[r.max-1] // replace
+	if !ok2 {
+		rep = r.max - 1
+	}
+	r.mapping[key] = rep
+	r.max--
+	if !ok1 {
+		val = key
+	}
+	return val
+}
+
 // LUR64 is a 64-bit version of LUR
 type LUR64 struct {
 	mapping map[int64]int64
