@@ -1,5 +1,5 @@
-# lurand
-Efficient Large Unique Random Generator (Concurrent Safety).  
+# LuRand
+Efficient Large Scale Unique Random Number Generator (Concurrent Safety).  
 
 ## Install
 `go get github.com/yihaoye/lurand`  
