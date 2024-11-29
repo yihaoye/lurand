@@ -15,17 +15,20 @@ import (
 func main() {
     // [0..1_000_000)
     r1 := lurand.New()
-    num := r1.Intn() // e.g. 876783
+    num := r1.Int31n() // e.g. 876783
 
     // [0..{custom})
     r2 := lurand.New_(10)
     for i := 0; i < 10; i++ {
-        num := r2.Intn() // outputs: 4, 8, 3, 0, 9, 1, 6, 2, 5, 7
+        num := r2.Int31n() // outputs: 4, 8, 3, 0, 9, 1, 6, 2, 5, 7
     }
-    r2.Intn() // panic: No more numbers available
+    r2.Int31n() // panic: No more numbers available
 
-    // Also support New32() New64()
-    // And Int31n() Int63n()
+    // Also support max duplicate times (i.e. k, default is 1) for each random number
+    r3 := lurand.New__(12, 3)
+    for i := 0; i < 12; i++ {
+        num := r3.Int31n() // outputs: 0, 3, 2, 0, 3, 1, 1, 2, 2, 0, 1, 3
+    }
 }
 ```
 

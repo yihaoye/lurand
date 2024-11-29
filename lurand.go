@@ -26,26 +26,33 @@ type LUR struct {
 	// current available number range
 	max int32
 
+	// max duplicate times, default set to 1
+	k int32
+
 	rnd *rand.Rand
 	mu  sync.Mutex
 }
 
 // New init time complexity O(1)
 func New() *LUR {
-	return &LUR{
-		mapping: make([]int32, ONE_MILLION),
-		max:     ONE_MILLION,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
+	return New__(ONE_MILLION, 1)
 }
 
 func New_(max int32) *LUR {
+	return New__(max, 1)
+}
+
+func New__(max int32, k int32) *LUR {
 	if max <= 0 || max > 100*ONE_MILLION {
 		panic("Invalid max setting")
+	}
+	if k <= 0 {
+		panic("Invalid k setting")
 	}
 	return &LUR{
 		mapping: make([]int32, max),
 		max:     max,
+		k:       k,
 		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
@@ -70,5 +77,5 @@ func (r *LUR) Int31n() int32 {
 	if val == 0 {
 		val = key
 	}
-	return val
+	return val / r.k
 }

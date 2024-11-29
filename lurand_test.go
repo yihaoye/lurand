@@ -46,6 +46,20 @@ func TestFunctions(t *testing.T) {
 		}
 	})
 
+	t.Run("custom max with max duplicate times k", func(t *testing.T) {
+		rg := New__(1_200_000, 4) // the actual random number range is [0, 300_000), here we apply max % k == 0 to make test simple
+		dedup := make(map[int32]int32)
+		for i := 0; i < 1_200_000; i++ {
+			num := rg.Int31n()
+			dedup[num]++
+		}
+		for num, count := range dedup {
+			if count != 4 {
+				t.Errorf("expected 4 duplicates, but got %d for num: %d", count, num)
+			}
+		}
+	})
+
 	t.Run("custom max parallel succeed", func(t *testing.T) {
 		rg := New_(1_500_000)
 		dedup := sync.Map{}
