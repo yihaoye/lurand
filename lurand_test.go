@@ -8,17 +8,17 @@ import (
 func TestFunctions(t *testing.T) {
 	t.Run("default max succeed", func(t *testing.T) {
 		rg := New()
-		dedup := make(map[int]bool)
-		for i := 0; i < defaultMax; i++ {
-			num := rg.Intn()
+		dedup := make(map[int32]bool)
+		for i := 0; i < ONE_MILLION; i++ {
+			num := rg.Int31n()
 			if dedup[num] {
 				t.Errorf("%d: duplicate num: %d", i, num)
 				return
 			}
 			dedup[num] = true
 		}
-		if len(dedup) != defaultMax {
-			t.Errorf("len(dedup) != defaultMax: %d != %d", len(dedup), defaultMax)
+		if len(dedup) != ONE_MILLION {
+			t.Errorf("len(dedup) != ONE_MILLION: %d != %d", len(dedup), ONE_MILLION)
 			return
 		}
 	})
@@ -35,9 +35,9 @@ func TestFunctions(t *testing.T) {
 		}()
 
 		rg := New()
-		dedup := make(map[int]bool)
-		for i := 0; i < defaultMax+1; i++ {
-			num := rg.Intn()
+		dedup := make(map[int32]bool)
+		for i := 0; i < ONE_MILLION+1; i++ {
+			num := rg.Int31n()
 			if dedup[num] {
 				t.Errorf("%d: duplicate num: %d", i, num)
 				return
@@ -58,7 +58,7 @@ func TestFunctions(t *testing.T) {
 			go func(workerID int) {
 				defer wg.Done()
 				for j := 0; j < numbersPerWorker; j++ {
-					num := rg.Intn()
+					num := rg.Int31n()
 					if _, loaded := dedup.LoadOrStore(num, true); loaded {
 						t.Errorf("worker %d: duplicate num: %d", workerID, num)
 						return
@@ -85,29 +85,21 @@ func TestFunctions(t *testing.T) {
 // goarch: amd64
 // cpu: 2.50GHz
 func BenchmarkTest(b *testing.B) {
-	// BenchmarkTest/New_-8         	 9195213	       253.7 ns/op	      19 B/op	       0 allocs/op
+	// BenchmarkTest/New_-8         	68782362	        77.63 ns/op	       4 B/op	       0 allocs/op
 	b.Run("New_", func(b *testing.B) {
-		rg := New_(b.N)
+		rg := New_(int32(b.N))
 		for i := 0; i < b.N; i++ {
-			_ = rg.Intn()
+			_ = rg.Int31n()
 		}
 	})
 
-	// BenchmarkTest/Parallel-8         	 3225256	       372.9 ns/op	      15 B/op	       0 allocs/op
+	// BenchmarkTest/Parallel-8     	 6146419	       218.4 ns/op	       4 B/op	       0 allocs/op
 	b.Run("Parallel", func(b *testing.B) {
-		rg := New_(b.N)
+		rg := New_(int32(b.N))
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; pb.Next(); i++ {
-				_ = rg.Intn()
+				_ = rg.Int31n()
 			}
 		})
-	})
-
-	// BenchmarkTest/New64_-8               	10168356	       246.4 ns/op	      18 B/op	       0 allocs/op
-	b.Run("New64_", func(b *testing.B) {
-		rg := New64_(int64(b.N))
-		for i := 0; i < b.N; i++ {
-			_ = rg.Int63n()
-		}
 	})
 }

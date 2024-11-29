@@ -30,5 +30,4 @@ func main() {
 ```
 
 ## Further Usage
-For example, in system design, if need to scale up further, could use multiple servers (like 100), each sever has an unique number from 0 to 99, when request come in, use load balance to randomly pick a server to generate the number with the library, and then concate the final result as `server_num.append(lib_num)`, and offline server if corresponding numbers are used up.  
-If worry about server availability, it is better to implement with db or cache instead of memory to store LUR.mapping and LUR.max.  
+For example, in system design, if need to scale up further (current lib limit within 100 million since it cost ~4GB), it is better to implement with cache db (e.g. Redis) or its cluster instead of memory to store LUR.mapping and LUR.max (easy to scale up to TB), which also ensure availability, and could apply Lua script to promise system level concurrent safety.  
