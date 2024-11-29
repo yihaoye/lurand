@@ -3,10 +3,20 @@ package lurand
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const defaultMax = 1_000_000 // default set to 1 million
+const (
+	ONE_MILLION = 1_000_000 // default max
+	ONE_BILLION = 1_000_000_000
+)
+
+var rPool = sync.Pool{
+	New: func() interface{} {
+		return rand.New(rand.NewSource(time.Now().UnixNano()))
+	},
+}
 
 // Use a map[int]int to implement large-scale unique random number generation.
 // For example, start by generating random numbers between 0 and 1,000,000.
@@ -17,152 +27,54 @@ const defaultMax = 1_000_000 // default set to 1 million
 // and overwrite it with the last available number, while decrementing max by 1.
 // This is similar to the Fisher–Yates Shuffle algorithm.
 type LUR struct {
-	mapping map[int]int // mapping random number to current available number
-	max     int         // current available number range
-	rnd     *rand.Rand
-	mu      sync.Mutex
+	mapping []int32 // mapping random number to current available number
+	max     int32   // current available number range
 }
 
 // New init time complexity O(1)
 func New() *LUR {
 	return &LUR{
-		mapping: make(map[int]int),
-		max:     defaultMax,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		mapping: make([]int32, ONE_MILLION),
+		max:     ONE_MILLION,
 	}
 }
 
-func New_(max int) *LUR {
-	if max <= 0 {
-		panic("Max must be greater than 0")
+func New_(max int32) *LUR {
+	if max <= 0 || max > (ONE_BILLION/10) {
+		panic("Invalid max value")
 	}
 	return &LUR{
-		mapping: make(map[int]int),
+		mapping: make([]int32, max),
 		max:     max,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
-// Intn time complexity O(1), space complexity O(N)
-func (r *LUR) Intn() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.max <= 0 {
+// Int31n time complexity O(1), space complexity O(N)
+func (r *LUR) Int31n() int32 {
+	max := atomic.AddInt32(&r.max, -1)
+	if max < 0 {
 		panic("No more numbers available")
 	}
-	delete(r.mapping, r.max) // optimize memory usage
+	if max == 0 {
+		return r.mapping[max]
+	}
 
-	key := r.rnd.Intn(r.max)
-	val, ok1 := r.mapping[key]
-	rep, ok2 := r.mapping[r.max-1] // replace
-	if !ok2 {
-		rep = r.max - 1
+	rep := r.mapping[max] // replace
+	if rep == 0 {
+		rep = max
 	}
-	r.mapping[key] = rep
-	r.max--
-	if !ok1 {
-		val = key
-	}
-	return val
-}
 
-// LUR32 is a 32-bit version of LUR
-type LUR32 struct {
-	mapping map[int32]int32
-	max     int32
-	rnd     *rand.Rand
-	mu      sync.Mutex
-}
+	rnd := rPool.Get().(*rand.Rand)
+	defer rPool.Put(rnd)
 
-func New32() *LUR32 {
-	return &LUR32{
-		mapping: make(map[int32]int32),
-		max:     int32(defaultMax),
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
+	for {
+		key := rnd.Int31n(atomic.LoadInt32(&r.max))
+		val := atomic.LoadInt32(&r.mapping[key])
+		if val == 0 {
+			val = key
+		}
+		if atomic.CompareAndSwapInt32(&r.mapping[key], val, rep) && key < atomic.LoadInt32(&r.max) {
+			return val
+		}
 	}
-}
-
-func New32_(max int32) *LUR32 {
-	if max <= 0 {
-		panic("Max must be greater than 0")
-	}
-	return &LUR32{
-		mapping: make(map[int32]int32),
-		max:     max,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-}
-
-func (r *LUR32) Int31n() int32 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.max <= 0 {
-		panic("No more numbers available")
-	}
-	delete(r.mapping, r.max)
-
-	key := r.rnd.Int31n(r.max)
-	val, ok1 := r.mapping[key]
-	rep, ok2 := r.mapping[r.max-1] // replace
-	if !ok2 {
-		rep = r.max - 1
-	}
-	r.mapping[key] = rep
-	r.max--
-	if !ok1 {
-		val = key
-	}
-	return val
-}
-
-// LUR64 is a 64-bit version of LUR
-type LUR64 struct {
-	mapping map[int64]int64
-	max     int64
-	rnd     *rand.Rand
-	mu      sync.Mutex
-}
-
-func New64() *LUR64 {
-	return &LUR64{
-		mapping: make(map[int64]int64),
-		max:     defaultMax,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-}
-
-func New64_(max int64) *LUR64 {
-	if max <= 0 {
-		panic("Max must be greater than 0")
-	}
-	return &LUR64{
-		mapping: make(map[int64]int64),
-		max:     max,
-		rnd:     rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-}
-
-func (r *LUR64) Int63n() int64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.max <= 0 {
-		panic("No more numbers available")
-	}
-	delete(r.mapping, r.max)
-
-	key := r.rnd.Int63n(r.max)
-	val, ok1 := r.mapping[key]
-	rep, ok2 := r.mapping[r.max-1] // replace
-	if !ok2 {
-		rep = r.max - 1
-	}
-	r.mapping[key] = rep
-	r.max--
-	if !ok1 {
-		val = key
-	}
-	return val
 }
