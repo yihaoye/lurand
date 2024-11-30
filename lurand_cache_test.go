@@ -7,12 +7,12 @@ import (
 )
 
 func TestCacheDBFunctions(t *testing.T) {
-	InitCache_("localhost:6379", 60)
+	InitCache("localhost:6379")
 	ctx := context.Background()
 	max := 10_000
 
 	t.Run("default max succeed", func(t *testing.T) {
-		rg := NewCacheLUR_(ctx, "ftest_", int32(max))
+		rg := NewCacheLUR_(ctx, "ftest_", int32(max), 60)
 		dedup := make(map[int32]bool)
 		for i := 0; i < max; i++ {
 			num, err := rg.Int31n(ctx)
@@ -33,7 +33,7 @@ func TestCacheDBFunctions(t *testing.T) {
 	})
 
 	t.Run("default max failed", func(t *testing.T) {
-		rg := NewCacheLUR_(ctx, "ftest2_", 1000)
+		rg := NewCacheLUR_(ctx, "ftest2_", 1000, 60)
 		var err error
 		for i := 0; i <= 1000; i++ {
 			_, err = rg.Int31n(ctx)
@@ -47,7 +47,7 @@ func TestCacheDBFunctions(t *testing.T) {
 	})
 
 	t.Run("custom max parallel succeed", func(t *testing.T) {
-		rg := NewCacheLUR_(ctx, "p_ftest_", int32(max))
+		rg := NewCacheLUR_(ctx, "p_ftest_", int32(max), 60)
 		dedup := sync.Map{}
 		var wg sync.WaitGroup
 		concurrentWorkers := 100
@@ -84,12 +84,12 @@ func TestCacheDBFunctions(t *testing.T) {
 }
 
 func BenchmarkCacheTest(b *testing.B) {
-	InitCache_("localhost:6379", 60)
+	InitCache("localhost:6379")
 	ctx := context.Background()
 
-	// BenchmarkCacheTest/NewCacheLUR_-8         	    3597	    413351 ns/op	     278 B/op	       7 allocs/op
+	// BenchmarkCacheTest/NewCacheLUR_-8         	    3476	    377372 ns/op	     278 B/op	       7 allocs/op
 	b.Run("NewCacheLUR_", func(b *testing.B) {
-		rg := NewCacheLUR_(ctx, "btest_", int32(b.N))
+		rg := NewCacheLUR_(ctx, "btest_", int32(b.N), 60)
 		for i := 0; i < b.N; i++ {
 			_, _ = rg.Int31n(ctx)
 		}
@@ -97,7 +97,7 @@ func BenchmarkCacheTest(b *testing.B) {
 
 	// BenchmarkCacheTest/ParallelCache-8        	   11744	    111448 ns/op	     279 B/op	       7 allocs/op
 	b.Run("ParallelCache", func(b *testing.B) {
-		rg := NewCacheLUR_(ctx, "p_btest_", int32(b.N))
+		rg := NewCacheLUR_(ctx, "p_btest_", int32(b.N), 60)
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; pb.Next(); i++ {
 				_, _ = rg.Int31n(ctx)
