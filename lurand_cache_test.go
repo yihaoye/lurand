@@ -32,6 +32,20 @@ func TestCacheDBFunctions(t *testing.T) {
 		}
 	})
 
+	t.Run("default max failed", func(t *testing.T) {
+		rg := NewCacheLUR_(ctx, "ftest2_", 1000)
+		var err error
+		for i := 0; i <= 1000; i++ {
+			_, err = rg.Int31n(ctx)
+			if err != nil {
+				break
+			}
+		}
+		if err == nil || err.Error() != "No more numbers available" {
+			t.Errorf("expected a used up error, but none occurred")
+		}
+	})
+
 	t.Run("custom max parallel succeed", func(t *testing.T) {
 		rg := NewCacheLUR_(ctx, "p_ftest_", int32(max))
 		dedup := sync.Map{}
