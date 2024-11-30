@@ -46,7 +46,7 @@ var (
 )
 
 func InitCache(addr string) {
-	InitCache_(addr, ONE_DAY)
+	InitCache_(addr, 0)
 }
 
 func InitCache_(addr string, t int) {
