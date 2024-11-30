@@ -2,6 +2,7 @@ package lurand
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -40,6 +41,8 @@ const (
 var (
 	client  *redis.Client
 	timeout int
+
+	once sync.Once
 )
 
 func InitCache(addr string) {
@@ -47,11 +50,19 @@ func InitCache(addr string) {
 }
 
 func InitCache_(addr string, t int) {
-	client = redis.NewClient(&redis.Options{
-		Addr:     addr,
-		PoolSize: 10,
+	InitCache__(addr, "", 0, t)
+}
+
+func InitCache__(addr, password string, db, t int) {
+	once.Do(func() {
+		client = redis.NewClient(&redis.Options{
+			Addr:     addr,
+			Password: password,
+			DB:       db,
+			PoolSize: 10,
+		})
+		timeout = t
 	})
-	timeout = t
 }
 
 type CacheLUR struct {
