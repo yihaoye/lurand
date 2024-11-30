@@ -33,4 +33,14 @@ func main() {
 ```
 
 ## Further Usage
-For example, in system design, if need to scale up further (current lib limit within 100 million since it cost ~4GB), it is better to implement with cache db (e.g. Redis) or its cluster instead of memory to store LUR.mapping and LUR.max (easy to scale up to TB), which also ensure availability, and could apply Lua script to promise system level concurrent safety.  
+For example, in system design, if need to scale up further (current lib limit within 100 million since it cost ~4GB), it is better to implement with cache db (e.g. Redis) or its cluster instead of memory to store LUR.mapping and LUR.max (easy to scale up to TB level), which also ensure availability, and could apply Lua script to promise system level concurrent safety.  
+
+Setup Redis with docker:  
+```bash
+docker pull redis:latest
+
+docker run -d --name my-redis -p 6379:6379 redis:latest
+# mkdir -p ~/redis-data
+# docker run -d --name my-redis -p 6379:6379 -v ~/redis-data:/data redis:latest --save 60 1
+```  
+And then test with [Code Example](./lurand_cache_test.go)  

@@ -57,7 +57,7 @@ func New__(max int32, k int32) *LUR {
 	}
 }
 
-// Intn time complexity O(1), space complexity O(N)
+// Int31n time complexity O(1), space complexity O(N)
 func (r *LUR) Int31n() int32 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -68,14 +68,14 @@ func (r *LUR) Int31n() int32 {
 
 	key := r.rnd.Int31n(r.max)
 	val := r.mapping[key]
+	if val == 0 {
+		val = key
+	}
 	rep := r.mapping[r.max-1] // replace
 	if rep == 0 {
 		rep = r.max - 1
 	}
 	r.mapping[key] = rep
 	r.max--
-	if val == 0 {
-		val = key
-	}
 	return val / r.k
 }
