@@ -42,9 +42,9 @@ import (
 )
 
 func main() {
-    InitCache_("localhost:6379", 60)
-	ctx := context.Background()
-    r1 := NewCacheLUR_(ctx, "{prefix_key}", 10_000)
+    lurand.InitCache_("localhost:6379", 60)
+    ctx := context.Background()
+    r1 := lurand.NewCacheLUR_(ctx, "{prefix_key}", 10_000)
     num, err := r1.Int31n(ctx)
     // ...
 }
