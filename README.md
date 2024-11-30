@@ -59,7 +59,7 @@ docker run -d --name my-redis -p 6379:6379 redis:latest
 # mkdir -p ~/redis-data
 # docker run -d --name my-redis -p 6379:6379 -v ~/redis-data:/data redis:latest --save 60 1
 ```  
-And then test with [Code Example](./lurand_cache_test.go)  
+And then run [test code example](./lurand_cache_test.go)  
 
 ## Further Usage
 Although the unique random number concatenation of two instances cannot guarantee statistical randomness, it can still achieve safe unpredictable unique value generation. The first one generates a constant prefix, and then the second one continues to generate until it is exhausted or the randomness ends, and the former generates a new prefix again. The disadvantage is that it may be wasteful in some cases.  
