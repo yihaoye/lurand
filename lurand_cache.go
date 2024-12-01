@@ -2,7 +2,6 @@ package lurand
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -38,55 +37,46 @@ const (
 	ONE_DAY = 24 * 60 * 60
 )
 
-var (
-	client *redis.Client
-
-	once sync.Once
-)
-
-func InitCache(addr string) {
-	InitCache_(addr, "", 0)
-}
-
-func InitCache_(addr, password string, db int) {
-	once.Do(func() {
-		client = redis.NewClient(&redis.Options{
-			Addr:     addr,
-			Password: password,
-			DB:       db,
-			PoolSize: 10,
-		})
-	})
-}
-
 type CacheLUR struct {
+	*redis.Client
+
 	key string
 	k   int32
 	ttl int32
 }
 
-func NewCacheLUR(ctx context.Context, key string, ttl int32) *CacheLUR {
-	return NewCacheLUR__(ctx, key, ONE_MILLION, 1, ttl)
+func NewCacheLUR(ctx context.Context, client *redis.Client, key string, ttl int32) *CacheLUR {
+	return NewCacheLUR__(ctx, client, key, ONE_MILLION, 1, ttl)
 }
 
-func NewCacheLUR_(ctx context.Context, key string, max, ttl int32) *CacheLUR {
-	return NewCacheLUR__(ctx, key, max, 1, ttl)
+func NewCacheLUR_(ctx context.Context, client *redis.Client, key string, max, ttl int32) *CacheLUR {
+	return NewCacheLUR__(ctx, client, key, max, 1, ttl)
 }
 
-func NewCacheLUR__(ctx context.Context, key string, max, k, ttl int32) *CacheLUR {
-	cmd := client.Set(ctx, key, max, time.Duration(ttl)*time.Second)
+func NewCacheLUR__(ctx context.Context, client *redis.Client, key string, max, k, ttl int32) *CacheLUR {
+	if max <= 0 {
+		panic("Invalid max setting")
+	}
+	if k <= 0 {
+		panic("Invalid k setting")
+	}
+	if client == nil {
+		panic("Invalid client setting")
+	}
+	cmd := client.Set(ctx, key, max*k, time.Duration(ttl)*time.Second)
 	if cmd.Err() != nil {
 		panic(cmd.Err())
 	}
 	return &CacheLUR{
-		key: key,
-		k:   k,
-		ttl: ttl,
+		Client: client,
+		key:    key,
+		k:      k,
+		ttl:    ttl,
 	}
 }
 
 func (r *CacheLUR) Int31n(ctx context.Context) (int32, error) {
-	val, err := client.Eval(ctx, script, []string{r.key}, r.ttl).Int()
+	val, err := r.Eval(ctx, script, []string{r.key}, r.ttl).Int()
 	if err != nil {
 		return -1, err
 	}

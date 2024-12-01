@@ -43,12 +43,13 @@ func New_(max int32) *LUR {
 }
 
 func New__(max int32, k int32) *LUR {
-	if max <= 0 || max > 100*ONE_MILLION {
+	if max <= 0 || max*k > 100*ONE_MILLION {
 		panic("Invalid max setting")
 	}
 	if k <= 0 {
 		panic("Invalid k setting")
 	}
+	max = max * k
 	return &LUR{
 		mapping: make([]int32, max),
 		max:     max,

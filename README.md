@@ -25,8 +25,8 @@ func main() {
     r2.Int31n() // panic: No more numbers available
 
     // Also support max duplicate times (i.e. k, default is 1) for each random number
-    r3 := lurand.New__(12, 3)
-    for i := 0; i < 12; i++ {
+    r3 := lurand.New__(4, 3)
+    for i := 0; i < 4; i++ {
         num := r3.Int31n() // outputs: 0, 3, 2, 0, 3, 1, 1, 2, 2, 0, 1, 3
     }
 }
@@ -42,9 +42,14 @@ import (
 )
 
 func main() {
-    lurand.InitCache("localhost:6379")
+    client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+		PoolSize: 10,
+	})
     ctx := context.Background()
-    r1 := lurand.NewCacheLUR_(ctx, "{prefix_key}", 10_000, 60)
+    r1 := lurand.NewCacheLUR_(ctx, client, "{prefix_key}", 10_000, 60)
     num, err := r1.Int31n(ctx)
     // ...
 }
