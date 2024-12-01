@@ -63,9 +63,12 @@ func NewCacheLUR__(ctx context.Context, client *redis.Client, key string, max, k
 	if client == nil {
 		panic("Invalid client setting")
 	}
-	cmd := client.Set(ctx, key, max*k, time.Duration(ttl)*time.Second)
-	if cmd.Err() != nil {
-		panic(cmd.Err())
+	ok, err := client.SetNX(ctx, key, max*k, time.Duration(ttl)*time.Second).Result()
+	if err != nil {
+		panic(err)
+	}
+	if !ok {
+		panic("Key already exist")
 	}
 	return &CacheLUR{
 		Client: client,
