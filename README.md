@@ -26,7 +26,7 @@ func main() {
 
     // Also support max duplicate times (i.e. k, default is 1) for each random number
     r3 := lurand.New__(4, 3)
-    for i := 0; i < 4; i++ {
+    for i := 0; i < 12; i++ {
         num := r3.Int31n() // outputs: 0, 3, 2, 0, 3, 1, 1, 2, 2, 0, 1, 3
     }
 }
