@@ -49,7 +49,7 @@ func main() {
 		PoolSize: 10,
 	})
     ctx := context.Background()
-    r1 := lurand.NewCacheLUR_(ctx, client, "{prefix_key}", 10_000, 60)
+    r1 := lurand.NewCacheLUR_(ctx, client, "{prefix_key}", 1_000_000_000, 0) // setup max range depends on Redis (cluster) memory capacity, last param 0 here means no ttl (specify ttl based on second)
     num, err := r1.Int31n(ctx)
     // ...
 }
@@ -67,4 +67,5 @@ docker run -d --name my-redis -p 6379:6379 redis:latest
 And then run [test code example](./lurand_cache_test.go)  
 
 ## Further Usage
-Although the unique random number concatenation of two instances cannot guarantee statistical randomness, it can still achieve safe unpredictable unique value generation. The first one generates a constant prefix, and then the second one continues to generate until it is exhausted or the randomness ends, and the former generates a new prefix again. The disadvantage is that it may be wasteful in some cases.  
+To scale up further, could use multiple servers (for example 100), each sever has an unique id from 0 to 99, when request come in, use load balance to randomly pick one server to generate the number with the library, and then concate the final result as `server_num.append(lib_num)`, and offline server if corresponding numbers are used up.  
+Option 2: although the unique random number concatenation of two instances cannot guarantee statistical randomness, it can still achieve safe unpredictable unique value generation. The first one generates a constant prefix, and then the second one continues to generate until it is exhausted or the randomness ends, and the former generates a new prefix again. The disadvantage is that it may be wasteful in some cases.  
