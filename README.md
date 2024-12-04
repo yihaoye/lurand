@@ -12,7 +12,7 @@ It also efficiently supports a feature where each random number is generated no 
 package main
 
 import (
-    github.com/yihaoye/lurand
+    "github.com/yihaoye/lurand"
 )
 
 func main() {
@@ -42,7 +42,10 @@ For example, in system design further usage, if need to scale up further (curren
 package main
 
 import (
-    github.com/yihaoye/lurand
+    "context"
+    
+    "github.com/yihaoye/lurand"
+    "github.com/go-redis/redis/v8"
 )
 
 func main() {
