@@ -1,6 +1,9 @@
 # LuRand
 Efficient Large Scale Unique Random Number Generator (Concurrent Safety).  
 
+This library efficiently generates unique random numbers. The base rand library naturally produces duplicate numbers, and simple deduplication is inefficient (for example, brute force with hashset etc). Instead, this library uses a lightweight algorithm to ensure `O(1)` time complexity for retrieving the next unique random number.  
+It also efficiently supports a feature where each random number is generated no more than `k` times.  
+  
 ## Install
 `go get github.com/yihaoye/lurand`  
 
@@ -29,6 +32,7 @@ func main() {
     for i := 0; i < 12; i++ {
         num := r3.Int31n() // outputs: 0, 3, 2, 0, 3, 1, 1, 2, 2, 0, 1, 3
     }
+    r3.Int31n() // panic: No more numbers available
 }
 ```
 
