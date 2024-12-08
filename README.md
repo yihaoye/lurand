@@ -56,6 +56,8 @@ func main() {
 		PoolSize: 10,
 	})
     ctx := context.Background()
+    _, _ = client.Eval(ctx, `math.randomseed(tonumber(ARGV[1]))`, []string{}, time.Now().Unix()).Result() // optional
+    
     r1 := lurand.NewCacheLUR_(ctx, client, "{prefix_key}", 1_000_000_000, 0) // setup max range depends on Redis (cluster) memory capacity, last param 0 here means no ttl (specify ttl based on second)
     num, err := r1.Int31n(ctx)
     // ...
