@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"runtime"
 	"sync"
 
 	"github.com/go-redis/redis/v8"
@@ -39,8 +40,12 @@ type CachePRP struct {
 	batch      uint64
 
 	mu       sync.Mutex
-	cur, end uint64 // reserved positions [cur, end)
+	spans    []span // reserved but not yet used positions
+	inflight int    // refills between INCRBY and handing their leftover span to spans
 }
+
+// span is a reserved range of positions [cur, end).
+type span struct{ cur, end uint64 }
 
 // NewCachePRP creates a distributed generator. The first instance initialises the
 // fingerprint; later instances (or restarts) with the same config attach to it.
@@ -95,28 +100,77 @@ func fingerprint(key []byte, max, k uint64) string {
 	return hex.EncodeToString(h.Sum(nil)[:16])
 }
 
-// Next returns the next number, or ErrExhausted once every position has been reserved.
+// Next returns the next number, or ErrExhausted once every position has been reserved
+// and this instance has none left. The Redis round trip happens outside the lock, so
+// concurrent callers refill in parallel.
 func (g *CachePRP) Next(ctx context.Context) (uint64, error) {
-	g.mu.Lock()
-	if g.cur >= g.end {
-		end, err := g.client.IncrBy(ctx, g.counterKey, int64(g.batch)).Result()
-		if err != nil {
-			g.mu.Unlock()
-			return 0, err
-		}
-		start := uint64(end) - g.batch
-		if start >= g.total {
-			g.mu.Unlock()
-			return 0, ErrExhausted
-		}
-		g.cur, g.end = start, uint64(end)
-		if g.end > g.total {
-			g.end = g.total
-		}
+	if i, ok := g.take(); ok {
+		return g.perm.At(i) / g.k, nil
 	}
-	i := g.cur
-	g.cur++
+
+	g.mu.Lock()
+	g.inflight++
 	g.mu.Unlock()
 
-	return g.perm.At(i) / g.k, nil
+	end, err := g.client.IncrBy(ctx, g.counterKey, int64(g.batch)).Result()
+	start := uint64(end) - g.batch
+
+	g.mu.Lock()
+	g.inflight--
+	if err == nil && start < g.total {
+		if stop := min64(uint64(end), g.total); start+1 < stop {
+			g.spans = append(g.spans, span{cur: start + 1, end: stop})
+		}
+	}
+	g.mu.Unlock()
+
+	switch {
+	case err != nil:
+		return 0, err
+	case start < g.total:
+		return g.perm.At(start) / g.k, nil
+	}
+
+	// The shared counter is exhausted, but another goroutine's refill may still be adding a span.
+	for {
+		g.mu.Lock()
+		if n := len(g.spans); n > 0 {
+			i := g.popLocked(n)
+			g.mu.Unlock()
+			return g.perm.At(i) / g.k, nil
+		}
+		pending := g.inflight
+		g.mu.Unlock()
+		if pending == 0 {
+			return 0, ErrExhausted
+		}
+		runtime.Gosched()
+	}
+}
+
+// take hands out a locally reserved position, if any.
+func (g *CachePRP) take() (uint64, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if n := len(g.spans); n > 0 {
+		return g.popLocked(n), true
+	}
+	return 0, false
+}
+
+func (g *CachePRP) popLocked(n int) uint64 {
+	s := &g.spans[n-1]
+	i := s.cur
+	s.cur++
+	if s.cur == s.end {
+		g.spans = g.spans[:n-1]
+	}
+	return i
+}
+
+func min64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
 }
