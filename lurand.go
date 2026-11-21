@@ -8,6 +8,9 @@ import (
 
 const (
 	ONE_MILLION = 1_000_000 // default max
+
+	// maxLURSize caps max*k for the in-memory LUR (~400MB of int32 slots).
+	maxLURSize = 100 * ONE_MILLION
 )
 
 // Use a map[int32]int32 to implement large-scale unique random number generation.
@@ -33,7 +36,8 @@ type LUR struct {
 	mu  sync.Mutex
 }
 
-// New init time complexity O(1)
+// New creates a generator over [0, 1_000_000).
+// Init allocates the whole mapping up front: time and space O(max*k).
 func New() *LUR {
 	return New__(ONE_MILLION, 1)
 }
@@ -43,11 +47,12 @@ func New_(max int32) *LUR {
 }
 
 func New__(max int32, k int32) *LUR {
-	if max <= 0 || max*k > 100*ONE_MILLION {
-		panic("Invalid max setting")
-	}
 	if k <= 0 {
 		panic("Invalid k setting")
+	}
+	// multiply in int64 so that max*k cannot overflow int32 and bypass the cap
+	if max <= 0 || int64(max)*int64(k) > maxLURSize {
+		panic("Invalid max setting")
 	}
 	max = max * k
 	return &LUR{
@@ -58,7 +63,7 @@ func New__(max int32, k int32) *LUR {
 	}
 }
 
-// Int31n time complexity O(1), space complexity O(N)
+// Int31n returns the next unique number. Time O(1); the generator holds O(max*k) space.
 func (r *LUR) Int31n() int32 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
