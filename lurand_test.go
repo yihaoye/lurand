@@ -95,6 +95,30 @@ func TestFunctions(t *testing.T) {
 	})
 }
 
+func TestInvalidSettings(t *testing.T) {
+	cases := []struct {
+		name   string
+		max, k int32
+	}{
+		{"zero max", 0, 1},
+		{"negative max", -1, 1},
+		{"zero k", 10, 0},
+		{"above cap", maxLURSize + 1, 1},
+		{"max*k above cap", maxLURSize/2 + 1, 2},
+		{"max*k overflows int32", 1 << 20, 1 << 12}, // product wraps to 0 in int32
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("New__(%d, %d): expected panic", c.max, c.k)
+				}
+			}()
+			New__(c.max, c.k)
+		})
+	}
+}
+
 // goos: darwin
 // goarch: amd64
 // cpu: 2.50GHz
