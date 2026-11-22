@@ -66,7 +66,12 @@ p.Index(code)     // 42: find a value's position without any lookup table
 The sequence itself is pure math: the same `(Max, K, Key)` always gives the same order, and the `i`-th number is `Permutation.At(i) / K`. The only state is **which position comes next**. Uniqueness depends on never using the same position twice, so:
 
 - **Single process, across restarts:** persist `Position()` (a file, a database row, ...) and resume with `NewPRPAt`. To avoid a write per number, reserve ahead: save `pos + 1000`, hand out positions up to it, then save the next block. A crash only skips the unused rest of a block; it never repeats a number.
-- **Several instances:** give each instance disjoint positions and call `Permutation.At` directly. For a fixed number of instances, instance `j` of `n` can use positions `j, j+n, j+2n, ...` with no coordination at all. For a dynamic number of instances, reserve blocks of positions from any atomic counter you already have (a database sequence, Redis `INCRBY`, etcd, ...).
+- **A fixed number of instances:** use `NewPRPShard`. Shard `j` of `n` takes positions `j, j+n, j+2n, ...`, so the shards together cover the sequence exactly once with no coordination at all. Each shard persists its own `Position()` and resumes with `NewPRPShardAt`. `n` must stay the same for the lifetime of the sequence, and each shard must run on at most one instance at a time.
+  ```go
+  g, err := lurand.NewPRPShard(cfg, podOrdinal, 3) // same cfg and shard count on every instance
+  num, err := g.Next()
+  ```
+- **A dynamic number of instances:** reserve blocks of positions from any atomic counter you already have (a database sequence, Redis `INCRBY`, etcd, ...) and call `Permutation.At(pos) / K` directly.
 
 ## How it works
 
@@ -115,12 +120,12 @@ What is covered:
 - key and domain separation
 - a chi-square uniformity test over 20,000 keys, which fails for 1–2 Feistel rounds and passes for 10
 - the official SipHash-2-4 test vector
-- concurrency and resume
+- sharding (shards partition the sequence exactly), concurrency and resume
 
 ## Changelog
 - **Redis support removed.** `CacheLUR` and its `go-redis` dependency are gone; the module now has no dependencies. With `PRP`, a distributed generator only needs a shared position counter, see [Restarts and multiple instances](#restarts-and-multiple-instances).
 - **Overflow check.** `max·k` is validated in 64-bit arithmetic. Previously the int32 product could overflow and bypass the size limit.
-- **New APIs:** `Permutation`, `PRP`.
+- **New APIs:** `Permutation`, `PRP` (`NewPRP`, `NewPRPAt`, `NewPRPShard`, `NewPRPShardAt`).
 
 ## References
 - R. A. Fisher, F. Yates (1938); R. Durstenfeld, *Algorithm 235: Random permutation*, CACM 1964.

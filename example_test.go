@@ -52,6 +52,29 @@ func ExamplePRP_resume() {
 	// Output: true 2
 }
 
+func ExampleNewPRPShard() {
+	key := []byte("an example key, keep yours secret")
+	cfg := lurand.PRPConfig{Max: 10, Key: key}
+
+	// three instances, e.g. shard = pod ordinal; together they hand out [0, 10) exactly once
+	for shard := uint64(0); shard < 3; shard++ {
+		g, _ := lurand.NewPRPShard(cfg, shard, 3)
+		var nums []uint64
+		for {
+			n, err := g.Next()
+			if err == lurand.ErrExhausted {
+				break
+			}
+			nums = append(nums, n)
+		}
+		fmt.Println(nums)
+	}
+	// Output:
+	// [9 4 0 3]
+	// [8 1 2]
+	// [6 5 7]
+}
+
 func ExamplePermutation_Index() {
 	key := []byte("an example key, keep yours secret")
 	p, _ := lurand.NewPermutation(1_000_000, key)

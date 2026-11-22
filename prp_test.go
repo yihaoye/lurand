@@ -256,3 +256,86 @@ func TestPRP(t *testing.T) {
 		}
 	})
 }
+
+func TestPRPShard(t *testing.T) {
+	t.Run("shards partition the sequence", func(t *testing.T) {
+		cfg := PRPConfig{Max: 10_007, K: 2, Key: testKey} // total not divisible by shards
+		ref, _ := NewPRP(cfg)
+		var want []uint64
+		for {
+			n, err := ref.Next()
+			if err != nil {
+				break
+			}
+			want = append(want, n)
+		}
+		for _, shards := range []uint64{1, 2, 3, 7, 64, 20_014} {
+			counts := make([]int, cfg.Max)
+			total := uint64(0)
+			for j := uint64(0); j < shards; j++ {
+				g, err := NewPRPShard(cfg, j, shards)
+				if err != nil {
+					t.Fatalf("shards=%d shard=%d: %v", shards, j, err)
+				}
+				for i := uint64(0); ; i++ {
+					n, err := g.Next()
+					if errors.Is(err, ErrExhausted) {
+						break
+					}
+					if n != want[j+i*shards] {
+						t.Fatalf("shards=%d shard=%d call %d: got %d, want %d", shards, j, i, n, want[j+i*shards])
+					}
+					counts[n]++
+					total++
+				}
+				if g.Remaining() != 0 {
+					t.Fatalf("shards=%d shard=%d: remaining %d", shards, j, g.Remaining())
+				}
+			}
+			if total != 20_014 {
+				t.Fatalf("shards=%d: %d numbers, want 20014", shards, total)
+			}
+			for n, c := range counts {
+				if c != 2 {
+					t.Fatalf("shards=%d: num %d returned %d times, want 2", shards, n, c)
+				}
+			}
+		}
+	})
+
+	t.Run("resume a shard", func(t *testing.T) {
+		cfg := PRPConfig{Max: 1000, Key: testKey}
+		ref, _ := NewPRPShard(cfg, 2, 3)
+		first, _ := NewPRPShard(cfg, 2, 3)
+		for i := 0; i < 100; i++ {
+			ref.Next()
+			first.Next()
+		}
+		resumed, err := NewPRPShardAt(cfg, 2, 3, first.Position())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for {
+			a, errA := ref.Next()
+			b, errB := resumed.Next()
+			if a != b || (errA == nil) != (errB == nil) {
+				t.Fatalf("diverged: %d/%v vs %d/%v", a, errA, b, errB)
+			}
+			if errA != nil {
+				break
+			}
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		cfg := PRPConfig{Max: 10, Key: testKey}
+		for _, c := range [][3]uint64{{0, 0, 0}, {3, 3, 0}, {0, 11, 0}, {0, 3, 5}} {
+			if _, err := NewPRPShardAt(cfg, c[0], c[1], c[2]); err == nil {
+				t.Errorf("shard=%d shards=%d pos=%d accepted", c[0], c[1], c[2])
+			}
+		}
+		if _, err := NewPRPShardAt(cfg, 0, 3, 4); err != nil { // shard 0 of 3 owns 4 positions
+			t.Errorf("valid end position rejected: %v", err)
+		}
+	})
+}

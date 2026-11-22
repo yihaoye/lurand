@@ -174,12 +174,15 @@ func (c PRPConfig) build() (perm *Permutation, k, total uint64, err error) {
 
 // PRP generates unique random numbers in [0, Max) (each exactly K times) in O(1) time
 // and O(1) space, independent of Max. Its only state is a counter: the i-th call returns
-// Permutation.At(i) / K. It is safe for concurrent use.
+// Permutation.At(offset + i*stride) / K, where offset = 0 and stride = 1 unless the
+// generator is a shard (see NewPRPShard). It is safe for concurrent use.
 type PRP struct {
-	next  uint64 // first field: 64-bit aligned for atomic access on 32-bit platforms
-	perm  *Permutation
-	k     uint64
-	total uint64
+	next   uint64 // first field: 64-bit aligned for atomic access on 32-bit platforms
+	perm   *Permutation
+	k      uint64
+	offset uint64 // first sequence position of this generator
+	stride uint64 // distance between consecutive positions of this generator
+	count  uint64 // number of positions this generator owns
 }
 
 // NewPRP creates a generator starting at position 0.
@@ -190,33 +193,58 @@ func NewPRP(cfg PRPConfig) (*PRP, error) {
 // NewPRPAt creates a generator that resumes at position pos (e.g. a value saved from
 // Position before a restart). With the same cfg it continues the same sequence.
 func NewPRPAt(cfg PRPConfig, pos uint64) (*PRP, error) {
+	return NewPRPShardAt(cfg, 0, 1, pos)
+}
+
+// NewPRPShard creates shard number shard of shards generators that together hand out
+// the whole sequence of cfg exactly once, with no coordination between them: shard j
+// uses sequence positions j, j+shards, j+2*shards, ... Run one shard per instance
+// (e.g. shard = pod ordinal) with the same cfg and shards on every instance.
+//
+// shards must not change while the sequence is in use, and each shard must run at
+// most once at a time; otherwise positions overlap and numbers repeat.
+func NewPRPShard(cfg PRPConfig, shard, shards uint64) (*PRP, error) {
+	return NewPRPShardAt(cfg, shard, shards, 0)
+}
+
+// NewPRPShardAt is NewPRPShard resuming at pos, a value saved from that shard's Position.
+func NewPRPShardAt(cfg PRPConfig, shard, shards, pos uint64) (*PRP, error) {
 	perm, k, total, err := cfg.build()
 	if err != nil {
 		return nil, err
 	}
-	if pos > total {
+	if shards == 0 || shards > total {
+		return nil, errors.New("lurand: shards must be in [1, Max*K]")
+	}
+	if shard >= shards {
+		return nil, errors.New("lurand: shard must be < shards")
+	}
+	count := (total - shard + shards - 1) / shards // positions p < total with p % shards == shard
+	if pos > count {
 		return nil, errors.New("lurand: position out of range")
 	}
-	return &PRP{next: pos, perm: perm, k: k, total: total}, nil
+	return &PRP{next: pos, perm: perm, k: k, offset: shard, stride: shards, count: count}, nil
 }
 
-// Next returns the next number, or ErrExhausted once all Max*K values have been returned.
+// Next returns the next number, or ErrExhausted once all values of this generator
+// (all Max*K values, or the shard's share of them) have been returned.
 func (g *PRP) Next() (uint64, error) {
 	i := atomic.AddUint64(&g.next, 1) - 1
-	if i >= g.total {
-		atomic.StoreUint64(&g.next, g.total) // keep the counter from creeping towards overflow
+	if i >= g.count {
+		atomic.StoreUint64(&g.next, g.count) // keep the counter from creeping towards overflow
 		return 0, ErrExhausted
 	}
-	return g.perm.At(i) / g.k, nil
+	return g.perm.At(g.offset+i*g.stride) / g.k, nil
 }
 
-// Position returns how many values have been handed out. Persist it to resume with NewPRPAt.
+// Position returns how many values this generator has handed out. Persist it to resume
+// with NewPRPAt (or NewPRPShardAt for a shard).
 func (g *PRP) Position() uint64 {
-	if pos := atomic.LoadUint64(&g.next); pos < g.total {
+	if pos := atomic.LoadUint64(&g.next); pos < g.count {
 		return pos
 	}
-	return g.total
+	return g.count
 }
 
-// Remaining returns how many values can still be handed out.
-func (g *PRP) Remaining() uint64 { return g.total - g.Position() }
+// Remaining returns how many values this generator can still hand out.
+func (g *PRP) Remaining() uint64 { return g.count - g.Position() }
