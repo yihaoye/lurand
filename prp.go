@@ -38,7 +38,7 @@ var ErrExhausted = errors.New("No more numbers available")
 //
 // Without the key, the order is computationally indistinguishable from a random
 // permutation, as long as n is not tiny (see README: below about 10^6 the Feistel
-// security bound gets weak and an in-memory shuffle such as LUR is the better choice).
+// security bound gets weak and an in-memory shuffle is the better choice).
 //
 // A Permutation holds no state besides its key: O(1) space for any n. It is safe for
 // concurrent use.
